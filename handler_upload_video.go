@@ -16,7 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
-	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 	"github.com/google/uuid"
 )
 
@@ -85,17 +84,49 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		log.Fatal("failed to reset temp file pointer")
 	}
 
+	processedPath, err := processVideoForFastStart(tmpFile.Name())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	pf, err := os.Open(processedPath)
+	if err != nil {
+		log.Fatal("error failed to open procesed path")
+	}
+	defer os.Remove(processedPath)
+	defer pf.Close()
+
+	videoOrientation, err := getVideoAspectRatio(pf.Name())
+	if err != nil {
+		log.Fatal("error getting video aspect")
+	}
+
+	var s3folderName string
+	switch videoOrientation {
+	case "16:9":
+		s3folderName = "landscape"
+	case "9:16":
+		s3folderName = "portrait"
+	default:
+		s3folderName = "other"
+	}
+
 	bytes := make([]byte, 32)
 	rand.Read(bytes)
 	fname := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(bytes)
 
-	fullFname := fmt.Sprintf("%s.%s", fname, ext)
-	cfg.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
+	fullFname := fmt.Sprintf("%s/%s.%s", s3folderName, fname, ext)
+	_, err = cfg.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
 		Bucket:      aws.String(cfg.s3Bucket),
 		Key:         aws.String(fullFname),
-		Body:        tmpFile,
+		Body:        pf,
 		ContentType: aws.String(mimeType),
 	})
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "s3 upload failed", err)
+		return
+	}
 
 	video, err := cfg.db.GetVideo(videoID)
 	if err != nil {
@@ -108,20 +139,22 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	s3VideoURL := fmt.Sprintf("https://%s.s3.ap-southeast-2.amazonaws.com/%s", cfg.s3Bucket, fullFname)
+	s3VideoURL := fmt.Sprintf("%s,%s", cfg.s3Bucket, fullFname)
 
-	updatedVideo := database.Video{
-		ID:                video.ID,
-		CreatedAt:         video.CreatedAt,
-		UpdatedAt:         time.Now().UTC(),
-		ThumbnailURL:      video.ThumbnailURL,
-		VideoURL:          &s3VideoURL,
-		CreateVideoParams: video.CreateVideoParams,
-	}
+	video.UpdatedAt = time.Now().UTC()
+	video.VideoURL = &s3VideoURL
 
-	err = cfg.db.UpdateVideo(updatedVideo)
+	fmt.Printf("VIDEO URL %s", *video.VideoURL)
+	err = cfg.db.UpdateVideo(video)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "failed to save to db", err)
 		return
 	}
+
+	presignedVideo, err := cfg.dbVideoToSignedVideo(video)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	respondWithJSON(w, http.StatusOK, presignedVideo)
 }

@@ -95,7 +95,14 @@ func (cfg *apiConfig) handlerVideoGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, video)
+	presignedVideo, err := cfg.dbVideoToSignedVideo(video)
+	if err != nil {
+		// If URL missing, return the video as-is or a clearer error
+		respondWithError(w, http.StatusConflict, "video has no uploaded file yet", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, presignedVideo)
 }
 
 func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Request) {
@@ -116,5 +123,15 @@ func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, videos)
+	presigned := make([]database.Video, 0, len(videos))
+	for _, v := range videos {
+		s, err := cfg.dbVideoToSignedVideo(v)
+		if err != nil {
+			// skip ones without URLs instead of failing the whole list
+			continue
+		}
+		presigned = append(presigned, s)
+	}
+
+	respondWithJSON(w, http.StatusOK, presigned)
 }
