@@ -97,8 +97,7 @@ func (cfg *apiConfig) handlerVideoGet(w http.ResponseWriter, r *http.Request) {
 
 	presignedVideo, err := cfg.dbVideoToSignedVideo(video)
 	if err != nil {
-		// If URL missing, return the video as-is or a clearer error
-		respondWithError(w, http.StatusConflict, "video has no uploaded file yet", err)
+		respondWithError(w, http.StatusConflict, "invalid video url", err)
 		return
 	}
 
