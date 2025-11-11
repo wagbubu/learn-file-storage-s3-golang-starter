@@ -2,18 +2,12 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"math"
-	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
-	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/ffprobe"
 )
 
@@ -90,7 +84,6 @@ func processVideoForFastStart(filePath string) (string, error) {
 	out := filepath.Join(dir, base+".processing")
 
 	cmd := exec.Command("ffmpeg", "-i", filePath, "-c", "copy", "-movflags", "faststart", "-f", "mp4", out)
-	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()
 	if err != nil {
@@ -100,44 +93,44 @@ func processVideoForFastStart(filePath string) (string, error) {
 	return out, nil
 }
 
-func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
-	pc := s3.NewPresignClient(s3Client)
-	input := s3.GetObjectInput{
-		Bucket: &bucket,
-		Key:    &key,
-	}
-	preq, err := pc.PresignGetObject(context.Background(), &input, s3.WithPresignExpires(expireTime))
-	if err != nil {
-		return "", err
-	}
+// func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
+// 	pc := s3.NewPresignClient(s3Client)
+// 	input := s3.GetObjectInput{
+// 		Bucket: &bucket,
+// 		Key:    &key,
+// 	}
+// 	preq, err := pc.PresignGetObject(context.Background(), &input, s3.WithPresignExpires(expireTime))
+// 	if err != nil {
+// 		return "", err
+// 	}
 
-	return preq.URL, nil
-}
+// 	return preq.URL, nil
+// }
 
-func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
-	videoURL := video.VideoURL
-	if videoURL == nil {
-		return video, nil
-	}
+// func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
+// 	videoURL := video.VideoURL
+// 	if videoURL == nil {
+// 		return video, nil
+// 	}
 
-	bk := strings.Split(*videoURL, ",")
-	if len(bk) != 2 {
-		return database.Video{}, errors.New("missing key or bucket")
-	}
-	bucket := strings.TrimSpace(bk[0])
-	key := strings.TrimSpace(bk[1])
+// 	bk := strings.Split(*videoURL, ",")
+// 	if len(bk) != 2 {
+// 		return database.Video{}, errors.New("missing key or bucket")
+// 	}
+// 	bucket := strings.TrimSpace(bk[0])
+// 	key := strings.TrimSpace(bk[1])
 
-	if bucket == "" || key == "" {
-		return database.Video{}, errors.New("missing key or bucket")
-	}
+// 	if bucket == "" || key == "" {
+// 		return database.Video{}, errors.New("missing key or bucket")
+// 	}
 
-	url, err := generatePresignedURL(cfg.s3Client, bucket, key, 2*time.Minute)
-	if err != nil {
-		return database.Video{}, err
-	}
+// 	url, err := generatePresignedURL(cfg.s3Client, bucket, key, 2*time.Minute)
+// 	if err != nil {
+// 		return database.Video{}, err
+// 	}
 
-	v := video
-	v.VideoURL = &url
+// 	v := video
+// 	v.VideoURL = &url
 
-	return v, nil
-}
+// 	return v, nil
+// }

@@ -95,13 +95,13 @@ func (cfg *apiConfig) handlerVideoGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	presignedVideo, err := cfg.dbVideoToSignedVideo(video)
-	if err != nil {
-		respondWithError(w, http.StatusConflict, "invalid video url", err)
-		return
-	}
+	// presignedVideo, err := cfg.dbVideoToSignedVideo(video)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusConflict, "invalid video url", err)
+	// 	return
+	// }
 
-	respondWithJSON(w, http.StatusOK, presignedVideo)
+	respondWithJSON(w, http.StatusOK, video)
 }
 
 func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Request) {
@@ -122,15 +122,15 @@ func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	presigned := make([]database.Video, 0, len(videos))
-	for _, v := range videos {
-		s, err := cfg.dbVideoToSignedVideo(v)
-		if err != nil {
-			// skip ones without URLs instead of failing the whole list
-			continue
-		}
-		presigned = append(presigned, s)
-	}
+	// presigned := make([]database.Video, 0, len(videos))
+	// for _, v := range videos {
+	// 	s, err := cfg.dbVideoToSignedVideo(v)
+	// 	if err != nil {
+	// 		// skip ones without URLs instead of failing the whole list
+	// 		continue
+	// 	}
+	// 	presigned = append(presigned, s)
+	// }
 
-	respondWithJSON(w, http.StatusOK, presigned)
+	respondWithJSON(w, http.StatusOK, videos)
 }
